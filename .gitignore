@@ -1,0 +1,67 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+Thumbs.db
+
+# IntelliJ / Android Studio / VS Code
+*.iml
+*.ipr
+*.iws
+.idea/
+.vscode/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+/coverage/
+
+# Symbolication & Obfuscation
+app.*.symbols
+app.*.map.json
+
+# Android Studio build artifacts
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+# ==========================================
+# Security & Sensitive Data (حماية البيانات الحساسة)
+# ==========================================
+
+# Environment Files
+.env
+.env.*
+*.env
+
+# Android Keystore & Signing Keys
+*.keystore
+*.jks
+key.properties
+
+# iOS Certificates & Provisioning Profiles
+*.p12
+*.mobileprovision
+*.pem
+*.cer
+
+# Firebase / Google Services Credentials
+google-services.json
+GoogleService-Info.plist
+# Ignore custom logo and branding images
+assets/images/
+echo "flutter_project_code.txt" >> .gitignore

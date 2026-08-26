@@ -1,0 +1,61 @@
+name: bazaarly_app
+description: "Basary Souq - Oman Classifieds"
+publish_to: 'none'
+version: 1.0.0+1
+
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  get_it: ^9.2.1
+  injectable: ^3.0.0
+  flutter_bloc: ^9.1.1
+  dio: ^5.11.0
+  retrofit: ^4.9.2
+  go_router: ^17.4.0
+  flutter_screenutil: ^5.9.3
+  json_annotation: ^4.12.0
+  google_mobile_ads: ^9.1.0
+  cached_network_image: ^3.4.1
+  url_launcher: ^6.3.2
+  image_picker: ^1.2.3
+  shared_preferences: ^2.5.5
+  flutter_html: ^3.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  build_runner: ^2.15.1
+  injectable_generator: ^3.1.1
+  retrofit_generator: ^10.2.8
+  json_serializable: ^6.14.1
+  flutter_launcher_icons: ^0.14.1
+  flutter_native_splash: ^2.4.1
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/app_icon.png"
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/images/app_icon.png"
+
+flutter_native_splash:
+  color: "#FFFFFF"
+  image: "assets/images/native_splash_icon.png"
+  android: true
+  ios: true
+  android_12:
+    image: "assets/images/native_splash_icon.png"
+    color: "#FFFFFF"
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/

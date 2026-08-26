@@ -1,0 +1,1711 @@
+﻿
+==================== FILE: C:\laragon\www\bazaarly_app\pubspec.yaml ====================
+
+name: bazaarly_app
+description: "Basary Souq - Oman Classifieds"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  get_it: ^9.2.1
+  injectable: ^3.0.0
+  flutter_bloc: ^9.1.1
+  dio: ^5.11.0
+  retrofit: ^4.9.2
+  go_router: ^17.4.0
+  flutter_screenutil: ^5.9.3
+  json_annotation: ^4.12.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  build_runner: ^2.15.1
+  injectable_generator: ^3.1.1
+  retrofit_generator: ^10.2.8
+  json_serializable: ^6.14.1
+  flutter_launcher_icons: ^0.14.1
+  flutter_native_splash: ^2.4.1
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/app_icon.png"
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/images/app_icon.png"
+
+flutter_native_splash:
+  color: "#FFFFFF"
+  image: "assets/images/native_splash_icon.png"
+  android: true
+  ios: true
+  android_12:
+    image: "assets/images/native_splash_icon.png"
+    color: "#FFFFFF"
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+
+==================== FILE: C:\laragon\www\bazaarly_app\lib\core\auth\auth_state.dart ====================
+
+import 'package:flutter/foundation.dart';
+
+/// حالة تسجيل الدخول (مؤقتة الآن للتجربة، لاحقًا تُربط بالتوكن الفعلي من الـ API)
+class AuthState extends ChangeNotifier {
+  AuthState._internal();
+  static final AuthState instance = AuthState._internal();
+
+  bool _isLoggedIn = false;
+  bool get isLoggedIn => _isLoggedIn;
+
+  void login() {
+    _isLoggedIn = true;
+    notifyListeners();
+  }
+
+  void logout() {
+    _isLoggedIn = false;
+    notifyListeners();
+  }
+}
+
+==================== FILE: C:\laragon\www\bazaarly_app\lib\core\network\dio_client.dart ====================
+
+import 'package:dio/dio.dart';
+
+// ✅ IP الكمبيوتر على Wi-Fi
+const String kApiBaseUrl = 'http://192.168.0.228:8000/api';
+const String kServerRootUrl = 'http://192.168.0.228:8000';
+
+class DioClient {
+  DioClient._internal();
+  static final DioClient instance = DioClient._internal();
+
+  final Dio dio = Dio(
+    BaseOptions(
+      baseUrl: kApiBaseUrl,
+      connectTimeout: const Duration(seconds: 15),
+      receiveTimeout: const Duration(seconds: 15),
+      headers: {'Accept': 'application/json'},
+    ),
+  );
+}
+
+String fullImageUrl(String path) {
+  if (path.startsWith('http')) return path;
+  if (path.isEmpty) return '';
+  return '$kServerRootUrl/storage/$path';
+}
+
+==================== FILE: C:\laragon\www\bazaarly_app\lib\core\router\app_router.dart ====================
+
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../auth/auth_state.dart';
+import '../../features/splash/presentation/pages/splash_page.dart';
+import '../../features/auth/presentation/pages/login_page.dart';
+import '../../features/home/presentation/pages/home_page.dart';
+import '../../features/listings/presentation/pages/add_listing_page.dart';
+import '../../features/listings/presentation/pages/favorites_page.dart';
+import '../../features/listings/presentation/pages/chat_page.dart';
+
+const _protectedPaths = ['/add-listing', '/favorites', '/chat'];
+
+final GoRouter appRouter = GoRouter(
+  initialLocation: '/splash',
+  refreshListenable: AuthState.instance,
+  redirect: (context, state) {
+    // 1. استثناء شاشة الـ Splash لتترك لها حرية التوجيه بعد انتهاء الوقت
+    final isSplash = state.matchedLocation == '/splash';
+    if (isSplash) return null;
+
+    final loggingIn = state.matchedLocation == '/login';
+    final isProtected = _protectedPaths.any(
+      (path) => state.matchedLocation.startsWith(path),
+    );
+    final isLoggedIn = AuthState.instance.isLoggedIn;
+
+    // 2. توجيه المستخدم لصفحة الدخول إذا حاول الوصول لصفحة محمية
+    if (isProtected && !isLoggedIn) {
+      return '/login?redirect=${state.matchedLocation}';
+    }
+
+    // 3. توجيه المستخدم للرئيسية إذا كان مسجلاً وبحاول فتح صفحة الدخول
+    if (loggingIn && isLoggedIn) {
+      return '/home';
+    }
+
+    return null;
+  },
+  routes: [
+    GoRoute(
+      path: '/splash',
+      builder: (context, state) => const SplashPage(),
+    ),
+    GoRoute(
+      path: '/home',
+      builder: (context, state) => const HomeScreen(),
+    ),
+    GoRoute(
+      path: '/login',
+      builder: (context, state) {
+        final redirect = state.uri.queryParameters['redirect'];
+        return LoginPage(redirectTo: redirect);
+      },
+    ),
+    GoRoute(
+      path: '/add-listing',
+      builder: (context, state) => const AddListingPage(),
+    ),
+    GoRoute(
+      path: '/favorites',
+      builder: (context, state) => const FavoritesPage(),
+    ),
+    GoRoute(
+      path: '/chat',
+      builder: (context, state) => const ChatPage(),
+    ),
+  ],
+);
+
+==================== FILE: C:\laragon\www\bazaarly_app\lib\core\theme\app_theme.dart ====================
+
+import 'package:flutter/material.dart';
+
+class AppColors {
+  static const primary = Color(0xFF2E2B5C);
+  static const accent = Color(0xFF5FBFA0);
+  static const primaryLight = Color(0xFFEDEBF5);
+  static const background = Color(0xFFF4F4F5);
+  static const surface = Color(0xFFFFFFFF);
+  static const textPrimary = Color(0xFF18181B);
+  static const textSecondary = Color(0xFF71717A);
+  static const border = Color(0xFFE4E4E7);
+  static const success = Color(0xFF22C55E);
+  static const danger = Color(0xFFEF4444);
+}
+
+class AppTheme {
+  static ThemeData get lightTheme {
+    return ThemeData(
+      useMaterial3: true,
+      scaffoldBackgroundColor: AppColors.background,
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: AppColors.primary,
+        primary: AppColors.primary,
+        secondary: AppColors.accent,
+        surface: AppColors.surface,
+      ),
+      appBarTheme: const AppBarTheme(
+        backgroundColor: AppColors.surface,
+        foregroundColor: AppColors.textPrimary,
+        elevation: 0,
+        centerTitle: true,
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(999),
+          ),
+          textStyle: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: AppColors.background,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(999),
+          borderSide: BorderSide.none,
+        ),
+      ),
+      fontFamily: 'Cairo',
+    );
+  }
+}
+
+==================== FILE: C:\laragon\www\bazaarly_app\lib\features\auth\presentation\pages\login_page.dart ====================
+
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../../../../core/auth/auth_state.dart';
+import '../../../../core/theme/app_theme.dart';
+
+class LoginPage extends StatelessWidget {
+  final String? redirectTo;
+  const LoginPage({super.key, this.redirectTo});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.surface,
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 8, 20, 0),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: IconButton(
+                  icon: const Icon(Icons.close, color: AppColors.textPrimary),
+                  onPressed: () => context.go('/home'),
+                ),
+              ),
+            ),
+            const Divider(height: 1, color: AppColors.border),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    const Text(
+                      'تسجيل الدخول لنشر إعلان',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                      ),
+                      textAlign: TextAlign.right,
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      'جاهز للبيع؟ سجّل الدخول وابدأ في نشر إعلاناتك الآن!',
+                      style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                      textAlign: TextAlign.right,
+                    ),
+                    const SizedBox(height: 28),
+                    Container(
+                      decoration: BoxDecoration(
+                        border: Border.all(color: AppColors.border),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          const Expanded(
+                            child: TextField(
+                              textAlign: TextAlign.right,
+                              decoration: InputDecoration(
+                                hintText: 'xxxxxxxx',
+                                border: InputBorder.none,
+                                filled: false,
+                                contentPadding:
+                                    EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                              ),
+                            ),
+                          ),
+                          Container(
+                            height: 44,
+                            width: 1,
+                            color: AppColors.border,
+                          ),
+                          const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 14),
+                            child: Text('+968', style: TextStyle(fontSize: 14)),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Container(
+                      decoration: BoxDecoration(
+                        border: Border.all(color: AppColors.border),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const TextField(
+                        textAlign: TextAlign.right,
+                        obscureText: true,
+                        decoration: InputDecoration(
+                          hintText: 'كلمة المرور',
+                          border: InputBorder.none,
+                          contentPadding:
+                              EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: () {},
+                        child: const Text('نسيت كلمة المرور؟'),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          // TODO: استبدلها بمنطق تسجيل دخول فعلي عبر الـ API
+                          AuthState.instance.login();
+                          if (redirectTo != null) {
+                            context.go(redirectTo!);
+                          } else {
+                            context.go('/home');
+                          }
+                        },
+                        child: const Text('تسجيل الدخول'),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Center(
+                      child: RichText(
+                        text: const TextSpan(
+                          style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                          children: [
+                            TextSpan(text: 'ليس لديك حساب؟ '),
+                            TextSpan(
+                              text: 'قم بإنشاء حساب جديد',
+                              style: TextStyle(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+==================== FILE: C:\laragon\www\bazaarly_app\lib\features\home\data\models\category_model.dart ====================
+
+class CategoryModel {
+  final int id;
+  final String nameAr;
+  final String nameEn;
+  final String? icon;
+
+  CategoryModel({
+    required this.id,
+    required this.nameAr,
+    required this.nameEn,
+    this.icon,
+  });
+
+  factory CategoryModel.fromJson(Map<String, dynamic> json) {
+    return CategoryModel(
+      id: json['id'] as int,
+      nameAr: json['name_ar'] ?? '',
+      nameEn: json['name_en'] ?? '',
+      icon: json['icon'],
+    );
+  }
+}
+
+==================== FILE: C:\laragon\www\bazaarly_app\lib\features\home\data\models\listing_model.dart ====================
+
+class ListingModel {
+  final int id;
+  final String title;
+  final String? description;
+  final String? price;
+  final String currency;
+  final String? categoryNameAr;
+  final String? cityNameAr;
+  final bool isFeatured;
+  final List<String> images;
+
+  ListingModel({
+    required this.id,
+    required this.title,
+    this.description,
+    this.price,
+    required this.currency,
+    this.categoryNameAr,
+    this.cityNameAr,
+    required this.isFeatured,
+    required this.images,
+  });
+
+  factory ListingModel.fromJson(Map<String, dynamic> json) {
+    final imagesJson = json['images'] as List<dynamic>? ?? [];
+    return ListingModel(
+      id: json['id'] as int,
+      title: json['title'] ?? '',
+      description: json['description'],
+      price: json['price']?.toString(),
+      currency: json['currency'] ?? '',
+      categoryNameAr: json['category']?['name_ar'],
+      cityNameAr: json['city']?['name_ar'],
+      isFeatured: json['is_featured'] == true,
+      images: imagesJson
+          .map((img) => img['path']?.toString() ?? '')
+          .where((p) => p.isNotEmpty)
+          .toList(),
+    );
+  }
+}
+
+==================== FILE: C:\laragon\www\bazaarly_app\lib\features\home\data\repositories\category_repository.dart ====================
+
+import 'package:dio/dio.dart';
+import '../../../../core/network/dio_client.dart';
+import '../models/category_model.dart';
+
+class CategoryRepository {
+  final Dio _dio = DioClient.instance.dio;
+
+  Future<List<CategoryModel>> fetchCategories() async {
+    try {
+      final response = await _dio.get('/categories');
+      final List<dynamic> data = response.data['data'];
+      return data.map((e) => CategoryModel.fromJson(e)).toList();
+    } catch (e) {
+      throw Exception('فشل في جلب الفئات: $e');
+    }
+  }
+}
+
+==================== FILE: C:\laragon\www\bazaarly_app\lib\features\home\data\repositories\home_repository.dart ====================
+
+import '../../../../core/network/dio_client.dart';
+import '../models/category_model.dart';
+import '../models/listing_model.dart';
+
+class HomeRepository {
+  final _dio = DioClient.instance.dio;
+
+  Future<List<CategoryModel>> getCategories() async {
+    final response = await _dio.get('/categories');
+    final data = response.data['data'] as List<dynamic>;
+    return data.map((e) => CategoryModel.fromJson(e)).toList();
+  }
+
+  Future<List<ListingModel>> getListings() async {
+    final response = await _dio.get('/listings');
+    // ملاحظة: Laravel Pagination يرجع البيانات جوه data.data (مو data مباشرة)
+    final data = response.data['data']['data'] as List<dynamic>;
+    return data.map((e) => ListingModel.fromJson(e)).toList();
+  }
+}
+
+==================== FILE: C:\laragon\www\bazaarly_app\lib\features\home\data\repositories\listing_repository.dart ====================
+
+import 'package:dio/dio.dart';
+import '../../../../core/network/dio_client.dart';
+import '../models/listing_model.dart';
+
+class ListingRepository {
+  final Dio _dio = DioClient.instance.dio;
+
+  Future<List<ListingModel>> fetchListings() async {
+    try {
+      final response = await _dio.get('/listings');
+      final List<dynamic> data = response.data['data']['data'];
+      return data.map((e) => ListingModel.fromJson(e)).toList();
+    } catch (e) {
+      throw Exception('فشل في جلب الإعلانات: $e');
+    }
+  }
+
+  Future<List<ListingModel>> fetchFeaturedListings() async {
+    final all = await fetchListings();
+    return all.where((l) => l.isFeatured).toList();
+  }
+}
+
+==================== FILE: C:\laragon\www\bazaarly_app\lib\features\home\presentation\pages\home_page.dart ====================
+
+import 'package:flutter/material.dart';
+import '../../../../core/network/dio_client.dart';
+import '../../data/models/category_model.dart';
+import '../../data/models/listing_model.dart';
+import '../../data/repositories/home_repository.dart';
+
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  final _repo = HomeRepository();
+
+  List<CategoryModel> categories = [];
+  List<ListingModel> featuredListings = [];
+  List<ListingModel> latestListings = [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final results = await Future.wait([
+        _repo.getCategories(),
+        _repo.getListings(),
+      ]);
+      final cats = results[0] as List<CategoryModel>;
+      final all = results[1] as List<ListingModel>;
+      setState(() {
+        categories = cats;
+        featuredListings = all.where((l) => l.isFeatured).toList();
+        latestListings = all;
+        _loading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = 'تعذّر تحميل البيانات. تأكد من اتصال السيرفر.';
+        _loading = false;
+      });
+    }
+  }
+
+  // خريطة أيقونة/لون احتياطية للفئات (نفس الأسلوب القديم)، حسب الاسم العربي القادم من الـ API
+  static const Map<String, Map<String, dynamic>> _categoryVisuals = {
+    'سيارات': {'icon': Icons.directions_car, 'color': Colors.red},
+    'عقارات': {'icon': Icons.home, 'color': Colors.blue},
+    'إلكترونيات': {'icon': Icons.devices, 'color': Colors.orange},
+    'وظائف': {'icon': Icons.work, 'color': Colors.green},
+    'أثاث': {'icon': Icons.chair, 'color': Colors.brown},
+    'خدمات': {'icon': Icons.build, 'color': Colors.purple},
+    'حيوانات': {'icon': Icons.pets, 'color': Colors.teal},
+    'ملابس': {'icon': Icons.checkroom, 'color': Colors.pink},
+  };
+
+  IconData _iconFor(String nameAr) =>
+      _categoryVisuals[nameAr]?['icon'] ?? Icons.category;
+
+  Color _colorFor(String nameAr) =>
+      _categoryVisuals[nameAr]?['color'] ?? Colors.grey;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+              ? _buildErrorState()
+              : RefreshIndicator(
+                  onRefresh: _loadData,
+                  child: CustomScrollView(
+                    slivers: [
+                      SliverToBoxAdapter(child: _buildSearchHeader()),
+                      SliverToBoxAdapter(child: _buildFeaturedBanner()),
+                      SliverPadding(
+                        padding: const EdgeInsets.all(16),
+                        sliver: SliverGrid(
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 4,
+                            childAspectRatio: 0.8,
+                            crossAxisSpacing: 10,
+                            mainAxisSpacing: 10,
+                          ),
+                          delegate: SliverChildBuilderDelegate(
+                            (context, index) =>
+                                _buildCategoryItem(categories[index]),
+                            childCount: categories.length,
+                          ),
+                        ),
+                      ),
+                      if (featuredListings.isNotEmpty) ...[
+                        SliverToBoxAdapter(
+                          child: _buildSectionTitle('إعلانات مميزة ⭐', () {}),
+                        ),
+                        SliverToBoxAdapter(
+                          child: SizedBox(
+                            height: 220,
+                            child: ListView.builder(
+                              scrollDirection: Axis.horizontal,
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              itemCount: featuredListings.length,
+                              itemBuilder: (context, index) =>
+                                  _buildFeaturedAdCard(featuredListings[index]),
+                            ),
+                          ),
+                        ),
+                      ],
+                      SliverToBoxAdapter(
+                        child: _buildSectionTitle('أحدث الإعلانات 🆕', () {}),
+                      ),
+                      latestListings.isEmpty
+                          ? const SliverToBoxAdapter(
+                              child: Padding(
+                                padding: EdgeInsets.only(top: 40, bottom: 40),
+                                child: Center(child: Text('لا توجد إعلانات حاليًا')),
+                              ),
+                            )
+                          : SliverPadding(
+                              padding: const EdgeInsets.all(16),
+                              sliver: SliverGrid(
+                                gridDelegate:
+                                    const SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: 2,
+                                  childAspectRatio: 0.75,
+                                  crossAxisSpacing: 12,
+                                  mainAxisSpacing: 12,
+                                ),
+                                delegate: SliverChildBuilderDelegate(
+                                  (context, index) =>
+                                      _buildAdCard(latestListings[index]),
+                                  childCount: latestListings.length,
+                                ),
+                              ),
+                            ),
+                    ],
+                  ),
+                ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {},
+        icon: const Icon(Icons.add),
+        label: const Text('أضف إعلان'),
+        backgroundColor: Colors.green,
+      ),
+    );
+  }
+
+  Widget _buildErrorState() {
+    return ListView(
+      children: [
+        const SizedBox(height: 120),
+        Icon(Icons.wifi_off_rounded, size: 48, color: Colors.grey[400]),
+        const SizedBox(height: 12),
+        Center(
+          child: Text(_error!, style: TextStyle(color: Colors.grey[600])),
+        ),
+        const SizedBox(height: 12),
+        Center(
+          child: TextButton(onPressed: _loadData, child: const Text('إعادة المحاولة')),
+        ),
+      ],
+    );
+  }
+
+  // 🔍 شريط البحث العلوي
+  Widget _buildSearchHeader() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 50, 16, 16),
+      decoration: BoxDecoration(
+        color: Colors.green[700],
+        borderRadius: const BorderRadius.only(
+          bottomLeft: Radius.circular(20),
+          bottomRight: Radius.circular(20),
+        ),
+      ),
+      child: Column(
+        children: [
+          TextField(
+            decoration: InputDecoration(
+              hintText: 'ابحث في مسقط، صلالة، صحار...',
+              hintStyle: const TextStyle(color: Colors.white70),
+              prefixIcon: const Icon(Icons.search, color: Colors.white),
+              filled: true,
+              fillColor: Colors.white.withOpacity(0.2),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+            ),
+            style: const TextStyle(color: Colors.white),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              const Icon(Icons.location_on, color: Colors.white, size: 18),
+              const SizedBox(width: 4),
+              const Text(
+                'مسقط، سلطنة عمان',
+                style: TextStyle(color: Colors.white, fontSize: 14),
+              ),
+              const Spacer(),
+              TextButton(
+                onPressed: () {},
+                child: const Text('تغيير', style: TextStyle(color: Colors.yellow)),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFeaturedBanner() {
+    return Container(
+      height: 140,
+      margin: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        gradient: const LinearGradient(colors: [Colors.orange, Colors.deepOrange]),
+      ),
+      child: const Center(
+        child: Text(
+          '📢 إعلان مميز هنا',
+          style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCategoryItem(CategoryModel category) {
+    final icon = _iconFor(category.nameAr);
+    final color = _colorFor(category.nameAr);
+    return InkWell(
+      onTap: () {},
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(icon, color: color, size: 28),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            category.nameAr,
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionTitle(String title, VoidCallback onSeeAll) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          TextButton(onPressed: onSeeAll, child: const Text('عرض الكل')),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFeaturedAdCard(ListingModel listing) {
+    return Container(
+      width: 180,
+      margin: const EdgeInsets.only(right: 12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        color: Colors.white,
+        boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.2), blurRadius: 8)],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            height: 120,
+            decoration: BoxDecoration(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+              color: Colors.grey[300],
+            ),
+            child: listing.images.isNotEmpty
+                ? ClipRRect(
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                    child: Image.network(
+                      fullImageUrl(listing.images.first),
+                      fit: BoxFit.cover,
+                      width: double.infinity,
+                      errorBuilder: (_, __, ___) =>
+                          const Center(child: Icon(Icons.image, size: 40, color: Colors.grey)),
+                    ),
+                  )
+                : const Center(child: Icon(Icons.image, size: 40, color: Colors.grey)),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  listing.title,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${listing.price ?? "-"} ${listing.currency}',
+                  style: TextStyle(
+                    color: Colors.green[700],
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Icon(Icons.location_on, size: 14, color: Colors.grey[600]),
+                    Text(
+                      listing.cityNameAr ?? '',
+                      style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAdCard(ListingModel listing) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        color: Colors.white,
+        boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.15), blurRadius: 6)],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            flex: 3,
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                color: Colors.grey[200],
+              ),
+              child: listing.images.isNotEmpty
+                  ? ClipRRect(
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                      child: Image.network(
+                        fullImageUrl(listing.images.first),
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        errorBuilder: (_, __, ___) =>
+                            const Center(child: Icon(Icons.image, color: Colors.grey)),
+                      ),
+                    )
+                  : const Center(child: Icon(Icons.image, color: Colors.grey)),
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: Padding(
+              padding: const EdgeInsets.all(10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    listing.title,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const Spacer(),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '${listing.price ?? "-"} ${listing.currency}',
+                        style: TextStyle(color: Colors.green[700], fontWeight: FontWeight.bold),
+                      ),
+                      Icon(Icons.favorite_border, size: 18, color: Colors.grey[400]),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+==================== FILE: C:\laragon\www\bazaarly_app\lib\features\listings\presentation\pages\add_listing_page.dart ====================
+
+import 'package:flutter/material.dart';
+import '../../../../core/theme/app_theme.dart';
+
+class AddListingPage extends StatelessWidget {
+  const AddListingPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(title: const Text('إضافة إعلان')),
+      body: const Center(child: Text('نموذج إضافة إعلان (قريبًا)')),
+    );
+  }
+}
+
+==================== FILE: C:\laragon\www\bazaarly_app\lib\features\listings\presentation\pages\chat_page.dart ====================
+
+import 'package:flutter/material.dart';
+import '../../../../core/theme/app_theme.dart';
+
+class ChatPage extends StatelessWidget {
+  const ChatPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(title: const Text('الدردشة')),
+      body: const Center(child: Text('محادثاتك (قريبًا)')),
+    );
+  }
+}
+
+==================== FILE: C:\laragon\www\bazaarly_app\lib\features\listings\presentation\pages\favorites_page.dart ====================
+
+import 'package:flutter/material.dart';
+import '../../../../core/theme/app_theme.dart';
+
+class FavoritesPage extends StatelessWidget {
+  const FavoritesPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(title: const Text('المفضلة')),
+      body: const Center(child: Text('إعلاناتك المفضلة (قريبًا)')),
+    );
+  }
+}
+
+==================== FILE: C:\laragon\www\bazaarly_app\lib\features\splash\presentation\pages\splash_page.dart ====================
+
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+
+class SplashPage extends StatefulWidget {
+  const SplashPage({super.key});
+
+  @override
+  State<SplashPage> createState() => _SplashPageState();
+}
+
+class _SplashPageState extends State<SplashPage>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _fadeAnimation;
+  late final Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // 1. إعداد وإطلاق الـ Animation
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+
+    _fadeAnimation = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeIn,
+    );
+
+    _scaleAnimation = Tween<double>(begin: 0.9, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: Curves.easeOutBack,
+      ),
+    );
+
+    _controller.forward();
+
+    // 2. التوجيه إلى الصفحة الرئيسية بعد 3 ثوانٍ
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) {
+        context.go('/home');
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: Center(
+        child: FadeTransition(
+          opacity: _fadeAnimation,
+          child: ScaleTransition(
+            scale: _scaleAnimation,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Image.asset(
+                  'assets/images/logo.png',
+                  width: 220,
+                ),
+                const SizedBox(height: 32),
+                const SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: CircularProgressIndicator(strokeWidth: 2.5),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+==================== FILE: C:\laragon\www\bazaarly_app\lib\main.dart ====================
+
+import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'features/home/data/models/listing_model.dart';
+import 'features/home/data/models/category_model.dart';
+import 'features/home/data/repositories/listing_repository.dart';
+import 'features/home/data/repositories/category_repository.dart';
+import 'core/network/dio_client.dart';
+
+void main() {
+  runApp(const MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      locale: const Locale('ar', 'OM'),
+      supportedLocales: const [
+        Locale('ar', 'OM'),
+        Locale('en', 'US'),
+      ],
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      builder: (context, child) {
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: child!,
+        );
+      },
+      theme: ThemeData(
+        fontFamily: 'Cairo',
+        useMaterial3: true,
+        appBarTheme: const AppBarTheme(centerTitle: true),
+      ),
+      home: const MainScreen(),
+    );
+  }
+}
+
+// ========== الشاشة الرئيسية ==========
+class MainScreen extends StatefulWidget {
+  const MainScreen({super.key});
+
+  @override
+  State<MainScreen> createState() => _MainScreenState();
+}
+
+class _MainScreenState extends State<MainScreen> {
+  int _selectedIndex = 0;
+
+  final List<Widget> _screens = [
+    const HomeScreen(),
+    const StoresScreen(),
+    const AddAdScreen(),
+    const SearchScreen(),
+    const AccountScreen(),
+  ];
+
+  void _onItemTapped(int index) {
+    if (index == 2) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const AddAdScreen()),
+      );
+    } else {
+      setState(() => _selectedIndex = index);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: _screens[_selectedIndex],
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, -2),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildNavItem(Icons.home_outlined, Icons.home, 'الرئيسية', 0),
+                _buildNavItem(Icons.storefront_outlined, Icons.storefront, 'المتاجر', 1),
+                _buildCenterButton(),
+                _buildNavItem(Icons.search, Icons.search, 'بحث', 3),
+                _buildNavItem(Icons.person_outline, Icons.person, 'حسابي', 4),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavItem(IconData icon, IconData activeIcon, String label, int index) {
+    final isSelected = _selectedIndex == index;
+    final color = isSelected ? const Color(0xFF1A2B4A) : Colors.grey;
+    return GestureDetector(
+      onTap: () => _onItemTapped(index),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(isSelected ? activeIcon : icon, color: color, size: 24),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 11,
+              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCenterButton() {
+    return GestureDetector(
+      onTap: () => _onItemTapped(2),
+      child: Container(
+        width: 56,
+        height: 56,
+        decoration: const BoxDecoration(
+          color: Color(0xFF2563EB),
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 4)),
+          ],
+        ),
+        child: const Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.add, color: Colors.white, size: 24),
+            Text(
+              'أضف إعلان',
+              style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ========== الصفحة الرئيسية (مربوطة بالـ API) ==========
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  final ListingRepository _listingRepo = ListingRepository();
+  final CategoryRepository _categoryRepo = CategoryRepository();
+
+  List<ListingModel> _listings = [];
+  List<CategoryModel> _categories = [];
+  bool _isLoading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    try {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+      final results = await Future.wait([
+        _listingRepo.fetchListings(),
+        _categoryRepo.fetchCategories(),
+      ]);
+      setState(() {
+        _listings = results[0] as List<ListingModel>;
+        _categories = results[1] as List<CategoryModel>;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    if (_error != null) {
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, size: 60, color: Colors.red),
+              const SizedBox(height: 16),
+              Text('فشل في التحميل', style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 8),
+              Text(_error!, textAlign: TextAlign.center),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: _loadData,
+                icon: const Icon(Icons.refresh),
+                label: const Text('إعادة المحاولة'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final featured = _listings.where((l) => l.isFeatured).toList();
+
+    return Scaffold(
+      body: RefreshIndicator(
+        onRefresh: _loadData,
+        child: CustomScrollView(
+          slivers: [
+            SliverToBoxAdapter(child: _buildSearchHeader()),
+            SliverToBoxAdapter(child: _buildFeaturedBanner()),
+
+            // ✅ الفئات من API
+            if (_categories.isNotEmpty) ...[
+              SliverPadding(
+                padding: const EdgeInsets.all(16),
+                sliver: SliverGrid(
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 4,
+                    childAspectRatio: 0.85,
+                    crossAxisSpacing: 10,
+                    mainAxisSpacing: 10,
+                  ),
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) => _buildCategoryItem(_categories[index]),
+                    childCount: _categories.length > 8 ? 8 : _categories.length,
+                  ),
+                ),
+              ),
+            ],
+
+            // ✅ إعلانات مميزة
+            if (featured.isNotEmpty) ...[
+              SliverToBoxAdapter(
+                child: _buildSectionTitle('إعلانات مميزة ⭐', () {}),
+              ),
+              SliverToBoxAdapter(
+                child: SizedBox(
+                  height: 240,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: featured.length,
+                    itemBuilder: (context, index) => _buildFeaturedCard(featured[index]),
+                  ),
+                ),
+              ),
+            ],
+
+            // ✅ أحدث الإعلانات
+            if (_listings.isNotEmpty) ...[
+              SliverToBoxAdapter(
+                child: _buildSectionTitle('أحدث الإعلانات', () {}),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.all(16),
+                sliver: SliverGrid(
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    childAspectRatio: 0.72,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                  ),
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) => _buildListingCard(_listings[index]),
+                    childCount: _listings.length > 10 ? 10 : _listings.length,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchHeader() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 50, 16, 16),
+      decoration: BoxDecoration(
+        color: Colors.green[700],
+        borderRadius: const BorderRadius.only(
+          bottomLeft: Radius.circular(20),
+          bottomRight: Radius.circular(20),
+        ),
+      ),
+      child: Column(
+        children: [
+          TextField(
+            textAlign: TextAlign.right,
+            decoration: InputDecoration(
+              hintText: 'ابحث في مسقط، صلالة، صحار...',
+              hintStyle: const TextStyle(color: Colors.white70),
+              prefixIcon: const Icon(Icons.search, color: Colors.white),
+              filled: true,
+              fillColor: Colors.white.withOpacity(0.2),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+            ),
+            style: const TextStyle(color: Colors.white),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              const Icon(Icons.location_on, color: Colors.white, size: 18),
+              const SizedBox(width: 4),
+              const Text(
+                'مسقط، سلطنة عمان',
+                style: TextStyle(color: Colors.white, fontSize: 14),
+              ),
+              const Spacer(),
+              TextButton(
+                onPressed: () {},
+                child: const Text('تغيير', style: TextStyle(color: Colors.yellow)),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFeaturedBanner() {
+    return Container(
+      height: 140,
+      margin: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        gradient: const LinearGradient(colors: [Colors.orange, Colors.deepOrange]),
+      ),
+      child: const Center(
+        child: Text(
+          'إعلان مميز هنا',
+          style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCategoryItem(CategoryModel category) {
+    final colors = [
+      Colors.red, Colors.blue, Colors.orange, Colors.green,
+      Colors.brown, Colors.purple, Colors.teal, Colors.pink
+    ];
+    final color = category.icon != null && category.icon!.isNotEmpty
+        ? Colors.green[700]!
+        : colors[category.id % colors.length];
+
+    return InkWell(
+      onTap: () {},
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(
+              _getCategoryIcon(category.icon),
+              color: color,
+              size: 26,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            category.nameAr,
+            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+
+  IconData _getCategoryIcon(String? iconName) {
+    final map = {
+      'car': Icons.directions_car,
+      'home': Icons.home,
+      'device': Icons.devices,
+      'work': Icons.work,
+      'chair': Icons.chair,
+      'build': Icons.build,
+      'pets': Icons.pets,
+      'checkroom': Icons.checkroom,
+    };
+    return map[iconName?.toLowerCase()] ?? Icons.category;
+  }
+
+  Widget _buildFeaturedCard(ListingModel listing) {
+    final imageUrl = listing.images.isNotEmpty
+        ? fullImageUrl(listing.images.first)
+        : '';
+
+    return Container(
+      width: 190,
+      margin: const EdgeInsets.only(left: 12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        color: Colors.white,
+        boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.15), blurRadius: 8)],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+            child: imageUrl.isNotEmpty
+                ? Image.network(
+                    imageUrl,
+                    height: 130,
+                    width: 190,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => _placeholderImage(130),
+                  )
+                : _placeholderImage(130),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  listing.title,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${listing.price} ${listing.currency}',
+                  style: TextStyle(color: Colors.green[700], fontWeight: FontWeight.bold, fontSize: 15),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Icon(Icons.location_on, size: 13, color: Colors.grey[600]),
+                    const SizedBox(width: 2),
+                    Text(
+                      listing.cityNameAr ?? 'غير محدد',
+                      style: TextStyle(color: Colors.grey[600], fontSize: 11),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildListingCard(ListingModel listing) {
+    final imageUrl = listing.images.isNotEmpty
+        ? fullImageUrl(listing.images.first)
+        : '';
+
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        color: Colors.white,
+        boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.12), blurRadius: 6)],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            flex: 3,
+            child: ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+              child: imageUrl.isNotEmpty
+                  ? Image.network(
+                      imageUrl,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => _placeholderImage(null),
+                    )
+                  : _placeholderImage(null),
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: Padding(
+              padding: const EdgeInsets.all(10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    listing.title,
+                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const Spacer(),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '${listing.price} ${listing.currency}',
+                        style: TextStyle(color: Colors.green[700], fontWeight: FontWeight.bold, fontSize: 14),
+                      ),
+                      Icon(Icons.favorite_border, size: 18, color: Colors.grey[400]),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _placeholderImage(double? height) {
+    return Container(
+      height: height,
+      color: Colors.grey[200],
+      child: const Center(child: Icon(Icons.image, color: Colors.grey)),
+    );
+  }
+
+  Widget _buildSectionTitle(String title, VoidCallback onSeeAll) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          TextButton(onPressed: onSeeAll, child: const Text('عرض الكل')),
+        ],
+      ),
+    );
+  }
+}
+
+// ========== الشاشات الأخرى ==========
+class SearchScreen extends StatelessWidget {
+  const SearchScreen({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('بحث'), backgroundColor: Colors.green[700], foregroundColor: Colors.white),
+      body: const Center(child: Text('شاشة البحث')),
+    );
+  }
+}
+
+class StoresScreen extends StatelessWidget {
+  const StoresScreen({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('المتاجر'), backgroundColor: Colors.green[700], foregroundColor: Colors.white),
+      body: const Center(child: Text('شاشة المتاجر')),
+    );
+  }
+}
+
+class AddAdScreen extends StatelessWidget {
+  const AddAdScreen({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('أضف إعلان'), backgroundColor: const Color(0xFF2563EB), foregroundColor: Colors.white),
+      body: const Center(child: Text('شاشة إضافة إعلان')),
+    );
+  }
+}
+
+class AccountScreen extends StatelessWidget {
+  const AccountScreen({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('حسابي'), backgroundColor: Colors.green[700], foregroundColor: Colors.white),
+      body: const Center(child: Text('شاشة حسابي')),
+    );
+  }
+}
